@@ -1,0 +1,326 @@
+---
+title: "Mon document"
+author: "Moi"
+date: "7 mars 2024"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Science des données
+
+### TP n°1. Méthodes de classification
+
+### Exercice 1. CAH d'un petit jeu de données
+
+De nombreuses méthodes de classiffication sont proposées par exemple
+dans les packages `ade4`, `cluster` ou encore `FactoMineR`. Nous
+utiliserons pour ce TP le seul package `cluster` qui permet
+d'implémenter les algorithmes de classification les plus célèbres (CAH
+et k−means.) Par ailleurs, les résultats de la classification peuvent
+être représentés joliment grâce au package `factoextra`.
+
+1.  Installation puis chargement des packages :
+
+```{r warning=FALSE, message=FALSE}
+#install.packages("cluster", dependencies = TRUE)
+#install.packages("factoextra", dependencies = TRUE)
+library(cluster)
+library(factoextra)
+```
+
+2.  Créer le jeu de données des cinq individus décrits par deux
+    variables x et y (exemple du cours).
+
+```{r warning=FALSE}
+data5 <- data.frame(x=c(1,2,2,4,4), y=c(2,0.5,1,3,2))
+```
+
+3.  Représenter ces données à l'aide d'un nuage de points :
+
+```{r warning=FALSE}
+plot(data5$x,data5$y, pch="", asp=1, xlab="x", ylab="y")
+text(data5$x,data5$y,labels=row.names(data5))
+grid(col="lightgrey", lty="dotted")
+```
+
+4.  Procéder de même à l'aide du package `ggplot` :
+
+```{r warning=FALSE}
+library(ggplot2)
+ggplot(data5, aes(x,y, label=rownames(data5))) +
+geom_point(col = "steelblue2", size = 2) +
+geom_text(hjust=-0.8, vjust=0) +
+ggtitle("Jeu de donnees vu en cours")
+```
+
+Un peu plus esthétique en ajoutant la librairie ggrepel pour gérer
+l'apparence et le placement automatique des libellés :
+
+```{r warning=FALSE}
+
+library(ggrepel)
+ggplot(data5, aes(x,y)) + 
+  geom_point(color = "pink1", size = 3) +
+  geom_label_repel(aes(label = rownames(data5))) +
+  ggtitle("Jeu de donn�es vu en cours")
+```
+
+5.  À l'aide de la fonction `agnes` du package `cluster`, réaliser la
+    CAH de ces individus avec les choix suivants : distance entre
+    individus = `city-block` ; indice d'agrégation = lien minimum.
+
+```{r warning=FALSE}
+# lien minimum
+res.agnes <- agnes(data5, stand=F, metric="manhattan", method="single")
+# lien maximum
+res.agnes <- agnes(data5, stand=F, metric="manhattan", method="complete")
+
+# Consulter l'objet r�sultat
+res.agnes
+```
+
+Consulter le contenu de l'objet résultat.
+
+6.  Afficher les éléments `order`, `height` et merge de l'objet
+    `res.agnes`.
+
+```{r warning=FALSE}
+res.agnes$order # Ordre des éléments de gauche à droite sur l'axe horizontal
+res.agnes$merge # Éléments (individus ou groupes) successivement agrégés
+res.agnes$height # Hauteur d'agrégation entre deux individus consécutifs
+```
+
+À l'aide de ces éléments, reproduire le dendrogramme associé à la CAH.
+
+7.  Vérifier que l'arbre obtenu est conforme à la représentation obtenue
+    par la commande ci-dessous. Deux graphiques sont successivement
+    produits : un graphique en bannière puis le dendrogramme.
+
+```{r warning=FALSE}
+plot(res.agnes)
+```
+
+Mode de construction : entre chaque couple d'individus, on trace la
+hauteur, puis colorie la partie haute - 1 et 2 sont agrégés à une
+hauteur de 2 - 2 et 3 sont agrégés à une hauteur de 0.5 - 3 et 4 sont
+agrégés à une hauteur de 3 - 4 et 5 sont agrégés à une hauteur de 1
+
+8.  Afficher maintenant le graphique en bannière. Comment celui-ci
+    est-il obtenu ?
+
+```{r warning=FALSE}
+fviz_dend(
+ res.agnes,
+ cex = 0.7,
+ palette = "jco",
+ rect = TRUE,
+ rect_fill = TRUE,
+ rect_border = "jco",
+ labels_track_height = 0.8)
+```
+
+9.  Repérer la valeur du coefficient AC (Agglomerative coefficient)
+    associé au dendrogramme. Quelle est sa définition (consulter l'aide
+    : `?agnes.object`) ? Comment interpréter graphiquement la valeur du
+    coefficient `AC`?
+
+$$AC = \frac{1}{n} \sum_{i=0}^{n} (1 - m(i))$$ Où
+$m(i) = \frac{h(i)}{h(max)}$
+
+$$AC = \frac{1}{5} \times((1-\frac{2}{3})+(1-\frac{0.5}{3})+(1-\frac{0.5}{3})+(1-\frac{1}{3})+(1-\frac{1}{3}))$$
+
+```{r}
+res.agnes$ac
+```
+
+*Interprération (d'aprés l'aide)* : "proportion du graphique qui est
+coloriée"
+
+10. Pour bien comprendre comment interpréter le graphique en bannière et
+    le coefficient `AC` associé à la classification, représenter le jeu
+    de données suivant puis effectuer sa classification (conserver les
+    mêmes indices de distance et d'agrégation) :
+
+```{r warning=FALSE}
+data12 <- data.frame(x=c(1,1,2,1.5,3.5,3.5,4,4,5,4.5,6,5.5), 
+                     y=c(5,6,5,6,1,2,1,2,7,8,7,8))
+
+library(ggrepel)
+ggplot(data12, aes(x,y)) + 
+  geom_point(color = "steelblue3", size = 3) +
+  geom_label_repel(aes(label = rownames(data12))) 
+
+res.agnes <- agnes(data12, stand=F, metric="manhattan", method="single")
+plot(res.agnes)
+
+# on voit bien que le coeff AC 0.81 correspond grosso modo au % colorié
+```
+
+11. Couper le dendrogramme obtenu en un nombre de classes k donné :
+
+```{r warning=FALSE}
+parti <- cutree(res.agnes, k=3) # k = nombre de classes ; h = hauteur
+parti
+```
+
+12. Lister les individus de chaque classe :
+
+```{r warning=FALSE}
+rownames(data12)[parti==1]
+rownames(data12)[parti==2]
+rownames(data12)[parti==3]
+```
+
+13. À l'aide de la fonction fviz_dend (package factoextra), afficher un
+    dendrogramme plus joli avec un code couleur différent pour chaque
+    classe de la partition :
+
+```{r warning=FALSE}
+fviz_dend(res.agnes, k=3)
+# Ajout de rectangles de couleurs différentes
+fviz_dend(
+res.agnes,
+k=3,
+rect = T, rect_fill = T,
+palette = "jco", rect_border = "jco"
+)
+```
+
+14. Enfin, représenter la partition obtenue sur un `biplot`. Une
+    enveloppe convexe est tracée autour de chaque classe. Si le jeu de
+    données comporte plus de 2 variables, alors une ACP est effectuée au
+    préalable puis la partition est représentée dans le plan engendré
+    par les deux premiers axes. Cette représentation nécessite la mise
+    en oeuvre des deux fonctions `hcut` et `fviz_cluster` du package
+    `factoextra`.
+
+```{r warning=FALSE}
+res.hcut <- hcut(
+data12,
+hc_func = "agnes",
+graph = TRUE,
+hc_metric = "manhattan",
+hc_method = "single",
+k=3
+)
+fviz_cluster(res.hcut, stand=FALSE, ellipse.type = "convex")
+fviz_cluster(
+res.hcut,
+stand = FALSE,
+ellipse.level = 0.95,
+ellipse.type = "confidence"
+)
+```
+
+15. Effectuer (à la main) la CAH du jeu de données `data5` en conservant
+    la distance du `city-block` mais en choisissant maintenant l'indice
+    d'agrégation du lien maximum. Utiliser les fonctions R appropriées
+    pour vérifier vos résultats.
+
+    ```{r}
+    res.agnes <- agnes(data5, stand=F, metric="manhattan", method="complete")
+    plot(res.agnes)
+    ```
+
+### Exercice 2. Classification à partir de données simulées
+
+1.  Que réalise la succession des commandes suivantes :
+
+    Simule des données (3 échantillons de taille 100) selon 3 lois
+    normales multivariées différentes
+
+```{r warning=FALSE}
+library(mvtnorm)
+# Matrices de variances covariances
+sigma1 <- matrix(c(1,0,0,1), ncol=2)
+sigma2 <- matrix(c(3,0,0,3), ncol=2)
+sigma3 <- matrix(c(2,0,0,2), ncol=2)
+
+
+A <- rmvnorm(n=100, mean=c(1,2), sigma=sigma1)
+B <- rmvnorm(n=100, mean=c(7,8), sigma=sigma2)
+C <- rmvnorm(n=100, mean=c(10,3), sigma=sigma3)
+
+data.norm <- as.data.frame(rbind(A,B,C))
+colnames(data.norm) <- c("X","Y")
+
+groupe <- rep(c("A", "B", "C"),c(100,100,100))
+data.norm$groupe <- as.factor(groupe)
+summary(data.norm)
+```
+
+2.  Représenter le jeu de données ainsi obtenu :
+
+```{r warning=FALSE}
+library(ggpubr)
+ggscatter(
+  data.norm,
+  x = "X",
+  y = "Y",
+  color = "groupe",
+  shape = "groupe",
+  ggtheme = theme_gray(),
+  size = 2,
+  mean.point = TRUE,
+  ellipse = T
+)
+```
+
+3.  À l'aide de la fonction `hcut`, réaliser la CAH du jeu de données en
+    choisissant l'indice de distance de Manhattan et la méthode
+    d'agrégation du lien minimum. Représenter les classes obtenues sur
+    un biplot à l'aide de la commande `fviz_cluster`. Que constate-ton ?
+
+```{r}
+library(factoextra)
+
+# On demande une partition en 3 classes
+res.hcut <- hcut(
+  data.norm[,1:2], 
+  hc_func = "agnes", 
+  hc_metric = "manhattan", 
+  hc_method = "single", 
+  k=3
+)  
+plot(res.hcut)
+
+fviz_cluster(res.hcut,  stand = FALSE, ellipse.type = "convex")
+```
+Ce ne sont pas du tout les classes attendues !
+
+4.  Recommencer avec la distance euclidienne et l'indice d'agrégation de
+    Ward.
+
+```{r}
+res.hcut <- hcut(
+  data.norm[,1:2], 
+  hc_func = "agnes", 
+  graph = TRUE,
+  hc_metric = "euclidean", 
+  hc_method = "ward", 
+  k=3
+)  
+
+plot(res.hcut)
+
+fviz_cluster(res.hcut,  stand = FALSE, ellipse.type = "convex")
+```
+
+Les classes semblent être en accord avec les 3 lois normales multivariées
+
+5.  Construire un tableau croisé entre l'appartenance réelle des
+    individus aux trois groupes et leur appartenance aux classes
+    obtenues par la classification.
+
+```{r}
+table(res.hcut$cluster, data.norm$groupe)
+```
+
+On observe un petit mélange entre les groupes 2 et 3, ceux qui étaient les plus proches dans la représentation graphique en 2 dimensions
