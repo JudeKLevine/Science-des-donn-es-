@@ -1,0 +1,429 @@
+---
+title: "TP3"
+author: "JUDE KLEVINE"
+date: "7 mars 2024"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# TP n°3. Méthodes de classification - Suite et fin
+
+Dans ce TD, nous allons dans un premier temps mettre en ÷uvre la CAH
+sur deux autres exemples (emmental et OGM.) Puis, nous verrons comment
+obtenir une partition d'un ensemble d'individus à l'aide d'une autre approche :
+les méthodes de partitionnement direct.
+Vous aurez besoin des packages `FactoMineR`, `MASS`, `cluster`, `ggpubr` et
+`factoextra`.
+
+<div style="border-bottom: 1px solid black;"></div>
+
+
+Librairies necessaires :
+
+```{r warning=FALSE, message=FALSE}
+library(FactoMineR)
+library(factoextra)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(MASS)
+```
+
+## Exercice 1. *Évaluation sensorielle de 52 emmentals*
+
+```{r warning=FALSE}
+ulr = "https://raw.githubusercontent.com/JudeKLevine/Science-des-donn-es-/main/Methode%20de%20classification/emmental.txt"
+emmental = read.delim2(ulr, stringsAsFactors=TRUE, row.names = 1)
+```
+
+```{r warning=FALSE}
+summary(emmental)
+names(emmental)
+head(emmental)
+```
+
+Lors d'une évaluation sensorielle, 52 emmentals ont été dégustés par un panel d'experts et
+notés selon 17 caractéristiques sensorielles de goût, de texture et de parfum.
+
+1. Réaliser l'ACP normée (variables actives = les 17 descripteurs sensoriels) puis la CAH
+à partir de toutes les coordonnées factorielles.
+
+
+```{r warning=FALSE}
+res.acp <-
+  PCA(
+    emmental,
+    scale.unit = TRUE,
+    ncp = Inf,
+  )
+```
+
+
+```{r warning=FALSE}
+names(res.acp)
+```
+
+Observer la décroissance de l'inertie : 
+
+```{r warning=FALSE}
+res.acp$eig
+fviz_eig(res.acp, addlabels = T)
+```
+
+CAH sur coordonnées factorielles
+
+```{r warning=FALSE}
+res.hcpc <-
+  HCPC(
+    res.acp ,
+    nb.clust = -1,
+    consol = FALSE,
+    min = 3,
+    max = 10,
+    graph = TRUE
+  )
+```
+
+Un arbre plus joli
+
+```{r warning=FALSE}
+fviz_dend(res.hcpc, 
+          cex = 0.7,                     # Taille du text
+          palette = "jco",               # Palette de couleur ?ggpubr::ggpar
+          rect = TRUE, rect_fill = TRUE, # Rectangle autour des groupes
+          rect_border = "jco"           # Couleur du rectangle
+)
+```
+
+2. Quel est le nombre optimal de classes selon le critère défini par FactoMineR ? Choisir ce
+nombre de classes
+
+En choisissant par défaut la coupure optimale, une partition en 6 classes est sélectionnée. Sinon, on peut consulter la valeur du critère et observer sa valeur minimale.
+
+```{r warning=FALSE}
+res.hcpc$call$t$quot
+```
+
+6 classes (car la première valeur du critère concerne une partition en 3 classes). On peut également soumettre la commande suivante qui ordonne les partitions de la meilleure à la moins bonne (entre 3 et 10 classes).
+
+```{r warning=FALSE}
+order(res.hcpc$call$t$quot)+2
+```
+
+3. Quelle est la caractéristique sensorielle principale des emmentals de la classe 2 ? Comment
+définir brièvement cette classe ?
+
+Description des classes par les variables quantitatives
+
+```{r warning=FALSE}
+res.hcpc$desc.var
+```
+
+Description de la classe 2 
+
+```{r warning=FALSE}
+res.hcpc$desc.var$quanti$'2'
+```
+
+Un graphique pour visualiser les variables les plus caractéristiques selon le `V-Test` (toujours regarder en valeur absolue !) 
+
+```{r warning=FALSE}
+# Création d'un data frame avec les données
+data <- as.data.frame(res.hcpc$desc.var$quanti$'2'[,1])
+
+# Tracé du graphique à barres
+ggplot(data, aes(x = data[,1], y = fct_reorder(rownames(data), data[,1]))) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "V-Test", y = "")
+
+```
+
+Interprétation de la 2e classe : Toutes les `V-Tests` sont négatives. Cela signifie que les individus de cette classe prennent des valeurs inférieures à la moyenne pour les variables retenues. Ce sont donc des emmentals peu granuleux, peu sucrés, peu fruités, etc.
+
+4. Quel est l'emmental représentant le mieux la classe 1 (dans le sens où il se rapproche le
+plus de l'emmental moyen de la classe) ? Idem pour la classe 4.
+
+Classe 1 : parangon (individu représentatif de la classe)
+
+```{r warning=FALSE}
+res.hcpc$desc.ind$para
+```
+
+Paragon Classe 1
+
+```{r warning=FALSE}
+res.hcpc$desc.ind$para$`1`
+```
+
+Paragon Classe 4
+
+```{r warning=FALSE}
+res.hcpc$desc.ind$para$`4`
+```
+
+L'individu 41
+
+5. Quel est l'individu le plus spécifique de la classe 2 (dans le sens où il est le plus éloigné
+des centres des autres classes) ? Idem pour la classe 6.
+
+Classe 2
+
+```{r warning=FALSE}
+res.hcpc$desc.ind$dist$`2`
+```
+
+L'individu 29
+
+Classe 4
+
+```{r warning=FALSE}
+res.hcpc$desc.ind$dist$`6`
+```
+
+L'individu 4
+
+On peut représenter les 6 classes d'individus sur le premier plan factoriel, puis repérer les individus précédents.
+
+```{r warning=FALSE}
+fviz_cluster(res.hcpc,
+             repel = TRUE,
+             # Evite le chevauchement des textes
+             show.clust.cent = TRUE,
+             # Montre le centre des classes
+             palette = "jco",
+             # Palette de couleurs, voir ?ggpubr::ggpar
+             ggtheme = theme_minimal(),
+             main = "Factor map")
+```
+
+6. Refaire la CAH en ne conservant que les 5 premières coordonnées factorielles des individus. Choisir le même nombre de classes que précédemment.
+
+```{r warning=FALSE}
+res.acp.5 <-
+  PCA(
+    emmental,
+    scale.unit = TRUE,
+    ncp = 5
+  )
+```
+
+CAH
+
+```{r warning=FALSE}
+res.hcpc.5 <-
+  HCPC(
+    res.acp.5 ,
+    nb.clust = 6
+  )
+```
+
+La meilleure partition est en 4 classes, mais on choisit 6
+
+```{r warning=FALSE}
+order(res.hcpc.5$call$t$quot)+2
+```
+
+7. Construire le tableau croisé entre les partitions obtenues dans chacune des 2 approches.
+Commenter
+
+On récupère les classes de chacun des 52 emmentals pour les 2 partitions avec toutes les coordonnées factorielles.
+
+```{r warning=FALSE}
+parti.Inf <- res.hcpc$data.clust$clust
+# avec 5 coordonn�es factorielles 
+parti.5 <- res.hcpc.5$data.clust$clust
+```
+
+Le tableau croisé
+
+```{r warning=FALSE}
+table(parti.Inf, parti.5)
+```
+Il y a peu de différences entre les 2 partitions (quelques individus changent de classe entre les classes 4 et 5).
+
+Quelle est la partition qui vous semble de meilleure qualité ?
+
+Une bonne partition se caractérise par une inertie INTRA faible (classes homogènes) ou une inertie INTER élevée (classes bien séparées).
+Il est équivalent d'étudier l'une ou l'autre de ces inerties pour déterminer la meilleure.
+
+On décide par exemple de comparer les inerties INTRA pour les deux partitions en 6 classes.
+
+Calcul des inerties INTRA 
+
+Avec tous les axes
+
+```{r warning=FALSE}
+res.hcpc$call$t$within
+```
+
+Avec 5 axes
+
+```{r warning=FALSE}
+res.hcpc.5$call$t$within
+```
+
+**Remarque** : l'inertie totale (donnée par la 1ère valeur : inertie INTRA de la partition en 1 classe) n'est pas la même pour les 2 approches. Cela s'explique par le fait que nous avons éliminé de l'information en ne conservant que 5 axes dans la 2ème approche. Pour comparer l'homogénéité des classes, il faut donc rapporter l'inertie INTRA à l'inertie totale.
+
+Avec tous les axes"
+
+```{r warning=FALSE}
+(W <- res.hcpc$call$t$within)
+(Tot <- W[1]) ; (W[6])
+(W[6]/W[1])
+```
+
+Avec 5 axes
+
+```{r warning=FALSE}
+(W <- res.hcpc.5$call$t$within)
+(Tot <- W[1]) ; (W[6])
+(W[6]/W[1])
+```
+
+Avec tous les axes : l'inertie INTRA représente environ 51,7% de l'inertie totale.
+Avec 5 axes : l'inertie INTRA représente environ 39,4% de l'inertie totale.
+
+Dans la seconde approche (5 axes), les classes sont donc plus homogènes (ou mieux séparées).
+
+## Exercice 2. CAH sur données d'enquête
+
+Réaliser une typologie des 135 personnes (adultes françaises) ayant répondu à l'enquête
+sur les organismes génétiquement modifiés (OGM).
+
+```{r}
+data("geyser")
+dim(geyser)
+head(geyser)  
+names(geyser)
+plot(geyser$duration, geyser$waiting)
+```
+
+## Exercice 3. L'algorithme des k − means
+
+On considère les données du geyser du package MASS. Elles décrivent, selon les deux paramètres suivants, 299 éruptions d'un geyser dans le parc naturel de Yellowstone :
+
+- la durée de l'éruption ;
+- le temps d'attente jusqu'à la prochaine éruption.
+
+L'objectif est de savoir si l'on peut construire, à l'aide de l'algorithme des k-means, une classification de ces données d'éruption.
+
+1. Représenter les observations dans l'espace engendré par les deux variables.
+
+```{r}
+library(ggpubr)
+ggscatter(
+  geyser,
+  x = "duration",
+  y = "waiting",
+  xlab = "Dur�e",
+  ylab = "Attente"
+) +
+  geom_density2d() # Add 2D density
+```
+
+Avec des dégradés de couleur selon le niveau de densité.
+
+```{r}
+ggscatter(
+  geyser,
+  x = "duration",
+  y = "waiting",
+  xlab = "Dur�e",
+  ylab = "Attente"
+) +
+  geom_density2d_filled(alpha=0.5) # Add 2D density
+```
+
+2. On utilise ensuite la fonction `fviz_nbclust` qui permet de suggérer le nombre de classes
+à introduire dans l'algorithme des k−means. Trois méthodes sont proposées : les critères `gap_stat` et `silhouette` recherchent un maximum alors que le critère `wss` (within clusters sum of squares) permet de repérer un coude éventuel.
+
+```{r}
+fviz_nbclust(geyser, kmeans, method = "wss")
+fviz_nbclust(geyser, kmeans, method = "gap_stat")
+fviz_nbclust(geyser, kmeans, method = "silhouette")
+```
+
+Quel nombre k de classes décidez-vous de retenir pour l'algorithme des k−means ?
+
+3. Mettre en œuvre les k−means en remplaçant la valeur de k dans la commande suivante
+par le nombre de classes retenu à la question précédente, puis visualiser les résultats :
+
+```{r}
+km.res <- kmeans(geyser, 2, nstart = 25)
+fviz_cluster(
+  km.res,
+  data = geyser,
+  ellipse.type = "convex",
+  palette = "jco",
+  repel = F,
+  ggtheme = theme_minimal()
+)
+```
+
+
+Si on essaie avec 3 classes ?
+
+```{r}
+km.res <- kmeans(geyser, 3, nstart = 25)
+fviz_cluster(
+  km.res,
+  data = geyser,
+  ellipse.type = "convex",
+  palette = "jco",
+  repel = F,
+  ggtheme = theme_minimal()
+)
+```
+
+Plutôt etrange comme choix de classe !
+
+4. Examiner les résultats fournis par la méthode des silhouettes :
+
+```{r}
+library(cluster)
+sil <- silhouette(km.res$cluster, dist(scale(geyser)))
+fviz_silhouette(sil)
+```
+
+On observe des observations a priori mal classées... (score négatif).
+
+5. Corriger l'approche précédente pour obtenir une classification plus pertinente !
+
+Il fallait bien entendu choisir de travailler sur des données centrées réduites
+
+```{r}
+geyser.cr <- scale(geyser)
+plot(geyser.cr, xlab = "duration CR", ylab = "waiting CR")
+
+fviz_nbclust(geyser.cr, kmeans,method = "wss")
+fviz_nbclust(geyser.cr, kmeans, method = "gap_stat")
+fviz_nbclust(geyser.cr, kmeans,method = "silhouette")
+```
+
+Le nombre de classes = 3 apparait maintenant comme un choix optimal
+
+```{r}
+km.res <- kmeans(geyser.cr, 3, nstart = 25)
+fviz_cluster(km.res, data = geyser,
+             ellipse.type = "convex",
+             palette = "jco",
+             repel = F,
+             ggtheme = theme_minimal())
+```
+
+On retrouve bien les 3 classes auxquelles on s'attend
+
+```{r}
+sil <- silhouette(km.res$cluster, dist(scale(geyser)))
+fviz_silhouette(sil)
+```
+
+Les silhouettes des classes sont maintenant bien plus satisfaisantes
